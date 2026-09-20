@@ -38,8 +38,8 @@ Before you begin, ensure you have met the following requirements:
 
 1. **Clone the repository:**
    ```bash
-   git clone https://github.com/yourusername/your-repo-name.git
-   cd your-repo-name
+   git clone https://github.com/AndreasKanell/Discord-Bot.git
+   cd Discord-Bot
    ```
 
 2. **Install the required dependencies:**
