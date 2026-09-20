@@ -7,7 +7,7 @@ This project is designed to be fully self-hosted, ensuring privacy and zero API 
 ## 🚀 Features
 
 ### 🤖 Local AI Integration
-* **Smart Responses:** Ask questions and interact with the bot using the `!ask` command or by simply tagging the bot (`@Bot`).
+* **Smart Responses:** Ask questions and interact with the bot using the `!ask` command.
 * **Zero API Costs:** Powered by [Ollama](https://ollama.com/) running locally (using Llama 3 / 3.1).
 * **Asynchronous Handling:** Built with `aiohttp` to ensure the bot remains responsive while the AI generates answers.
 
