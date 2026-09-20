@@ -237,39 +237,32 @@ async def serverinfo(ctx):
 # Ask command (Connected to local AI model)
 @bot.command()
 async def ask(ctx, *, prompt: str):
-    # 1. Στέλνουμε ένα προσωρινό μήνυμα ώστε ο χρήστης να ξέρει ότι το bot το επεξεργάζεται
-    wait_msg = await ctx.send("🤔 Σκέφτομαι την απάντηση... (μπορεί να πάρει λίγο χρόνο)")
+    wait_msg = await ctx.send("🤔 Thinking about the answer... (may take some time)")
 
-    # 2. Το προεπιλεγμένο τοπικό URL του Ollama API
     url = "http://localhost:11434/api/generate"
     
-    # 3. Τα δεδομένα που στέλνουμε στο μοντέλο
     payload = {
-        "model": "llama3.1:latest", # Προσοχή: Άλλαξέ το ακριβώς στο όνομα του μοντέλου που έχεις κατεβάσει (π.χ. llama3, llama3.1)
+        "model": "llama3.1:latest", 
         "prompt": prompt,
-        "stream": False # Ζητάμε ολόκληρη την απάντηση μονομιάς, όχι λέξη-λέξη
+        "stream": False
     }
 
-    # 4. Ανοίγουμε την ασύγχρονη σύνδεση
     async with aiohttp.ClientSession() as session:
         try:
-            # Κάνουμε POST request στο API
             async with session.post(url, json=payload) as response:
                 if response.status == 200:
                     data = await response.json()
-                    answer = data.get("response", "Δεν έλαβα απάντηση από το μοντέλο.")
+                    answer = data.get("response", "I didn't get the answer from the model.")
                     
-                    # Το Discord έχει όριο 2000 χαρακτήρες ανά μήνυμα. Κόβουμε το κείμενο αν βγει τεράστιο.
                     if len(answer) > 1950:
-                        answer = answer[:1950] + "\n... [Η απάντηση κόπηκε λόγω ορίου χαρακτήρων]"
+                        answer = answer[:1950] + "\n... [The answer was cut due to words limit]"
                         
-                    # Επεξεργαζόμαστε το αρχικό μήνυμα "Σκέφτομαι..." και βάζουμε την τελική απάντηση
                     await wait_msg.edit(content=answer)
                 else:
-                    await wait_msg.edit(content=f"⚠️ Σφάλμα επικοινωνίας: Κωδικός {response.status}")
+                    await wait_msg.edit(content=f"⚠️ Communication error: Code {response.status}")
         
         except aiohttp.ClientConnectorError:
-            await wait_msg.edit(content="❌ Δεν μπόρεσα να συνδεθώ στο Ollama. Σιγουρέψου ότι η εφαρμογή τρέχει στο background του υπολογιστή σου.")
+            await wait_msg.edit(content="❌ I couldn't connect to Ollama. Please make sure that the Ollama app is running at the backround of your pc.")
 
 # Help command
 @bot.command()
