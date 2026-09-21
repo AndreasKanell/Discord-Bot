@@ -1,9 +1,12 @@
+import asyncio
+from html import unescape
 import aiohttp
 import discord
 from discord.ext import commands
 import logging
 from dotenv import load_dotenv
 import os 
+import random
 
 load_dotenv()
 token = os.getenv('DISCORD_TOKEN')
@@ -153,6 +156,8 @@ async def on_member_update(before, after):
             
         await log_channel.send(embed=embed)
 
+# ---------------------------- Commands --------------------------------------------
+
 # !hello 
 @bot.command()
 async def hello(ctx):
@@ -264,6 +269,153 @@ async def ask(ctx, *, prompt: str):
         except aiohttp.ClientConnectorError:
             await wait_msg.edit(content="❌ I couldn't connect to Ollama. Please make sure that the Ollama app is running at the backround of your pc.")
 
+# weather 
+@bot.command()
+async def weather(ctx, *,  city: str):
+    API_KEY="b997d99e6b49cb7ec166cebecd5f2367"
+    url = f"http://api.openweathermap.org/data/2.5/weather?q={city}&appid={API_KEY}&units=metric&lang=el"
+
+    async with aiohttp.ClientSession() as session:
+        try:
+            async with session.get(url) as response:
+                if response.status == 200:
+                    data = await response.json()
+                    
+                    city_name = data["name"]
+                    country = data["sys"]["country"]
+                    temp = data["main"]["temp"]
+                    feels_like = data["main"]["feels_like"]
+                    humidity = data["main"]["humidity"]
+                    description = data["weather"][0]["description"].capitalize()
+                    icon_code = data["weather"][0]["icon"] 
+
+                    embed = discord.Embed(
+                        title=f"🌤️ Καιρός σε {city_name}, {country}",
+                        color=discord.Color.blue()
+                    )
+                    
+                    embed.add_field(name="Θερμοκρασία", value=f"{temp}°C", inline=True)
+                    embed.add_field(name="Αίσθηση", value=f"{feels_like}°C", inline=True)
+                    embed.add_field(name="Υγρασία", value=f"{humidity}%", inline=True)
+                    embed.add_field(name="Συνθήκες", value=description, inline=False)
+                    
+                    embed.set_thumbnail(url=f"http://openweathermap.org/img/wn/{icon_code}@2x.png")
+
+                    await ctx.send(embed=embed)
+                
+                elif response.status == 404:
+                    await ctx.send(f"❌ Η περιοχή '{city}' δεν βρέθηκε. Δοκίμασε με λατινικούς χαρακτήρες (π.χ. Athens).")
+                else:
+                    await ctx.send(f"⚠️ Πρόβλημα με το API. Κωδικός σφάλματος: {response.status}")
+                    
+        except Exception as e:
+            await ctx.send(f"❌ Σφάλμα σύνδεσης: {e}")
+
+
+class TriviaView(discord.ui.View):
+    def __init__(self, correct_label, correct_answer, author):
+        #  15 seconds timout
+        super().__init__(timeout=15.0) 
+        self.correct_label = correct_label
+        self.correct_answer = correct_answer
+        self.author = author
+        self.message = None 
+
+    async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        if interaction.user != self.author:
+            await interaction.response.send_message("❌ This is not your trivia question!", ephemeral=True)
+            return False
+        return True
+
+    
+    async def process_answer(self, interaction: discord.Interaction, choice: str):
+        # disable all the buttons
+        for child in self.children:
+            child.disabled = True
+        await self.message.edit(view=self)
+
+        # sends the answer
+        if choice == self.correct_label:
+            await interaction.response.send_message(f"✅ Correct! The answer is **{self.correct_answer}**.")
+        else:
+            await interaction.response.send_message(f"❌ Wrong! The correct answer was **{self.correct_label}** ({self.correct_answer}).")
+        
+        self.stop()
+
+    @discord.ui.button(label="A", style=discord.ButtonStyle.primary)
+    async def btn_a(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await self.process_answer(interaction, "A")
+
+    @discord.ui.button(label="B", style=discord.ButtonStyle.primary)
+    async def btn_b(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await self.process_answer(interaction, "B")
+
+    @discord.ui.button(label="C", style=discord.ButtonStyle.primary)
+    async def btn_c(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await self.process_answer(interaction, "C")
+
+    @discord.ui.button(label="D", style=discord.ButtonStyle.primary)
+    async def btn_d(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await self.process_answer(interaction, "D")
+
+    # if 15 have passed
+    async def on_timeout(self):
+        if self.message:
+            for child in self.children:
+                child.disabled = True
+            await self.message.edit(view=self)
+            await self.message.reply(f"⏳ Time is up! The correct answer was **{self.correct_label}** ({self.correct_answer}).")
+
+# tech quiz command
+@bot.command()
+async def quiz(ctx):
+    url = "https://opentdb.com/api.php?amount=1&category=18&type=multiple"
+
+    async with aiohttp.ClientSession() as session:
+        try:
+            async with session.get(url) as response:
+                if response.status == 200:
+                    data = await response.json()
+                    
+                    if data["response_code"] != 0:
+                        await ctx.send("⚠️ Could not fetch a trivia question at the moment.")
+                        return
+
+                    question_data = data["results"][0]
+                    question = unescape(question_data["question"])
+                    correct_answer = unescape(question_data["correct_answer"])
+                    incorrect_answers = [unescape(ans) for ans in question_data["incorrect_answers"]]
+
+                    all_options = incorrect_answers + [correct_answer]
+                    random.shuffle(all_options)
+
+                    labels = ["A", "B", "C", "D"]
+                    options_dict = {labels[i]: all_options[i] for i in range(4)}
+                    correct_label = [k for k, v in options_dict.items() if v == correct_answer][0]
+
+                    options_text = "\n".join([f"**{k}.** {v}" for k, v in options_dict.items()])
+
+                    embed = discord.Embed(
+                        title="🧠 Tech Trivia Time!",
+                        description=f"**{question}**\n\n{options_text}",
+                        color=discord.Color.purple()
+                    )
+
+                    embed.set_footer(text="Click a button below. You have 15 seconds!")
+
+                    
+                    view = TriviaView(correct_label, correct_answer, ctx.author)
+                    
+                    message = await ctx.send(embed=embed, view=view)
+                    
+                    view.message = message
+
+                else:
+                    await ctx.send(f"⚠️ API Error. Status code: {response.status}")
+                    
+        except Exception as e:
+            await ctx.send(f"❌ Connection error: {e}")
+
 # Help command
 @bot.command()
 async def help(ctx):
@@ -301,6 +453,20 @@ async def help(ctx):
     embed.set_footer(
         text=f"Requested from {ctx.author.display_name}",
         icon_url=ctx.author.display_avatar.url
+    )
+
+    # Weather Command
+    embed.add_field(
+        name="🌤️ Weather", 
+        value="`!weather [city]` - Displays the current weather conditions and temperature for the specified city.", 
+        inline=False
+    )
+
+    # Quiz Command
+    embed.add_field(
+        name="🧠 Quiz", 
+        value="`!quiz` - Starts a 15-second interactive multiple-choice tech quiz using buttons.", 
+        inline=False
     )
 
     await ctx.send(embed=embed)

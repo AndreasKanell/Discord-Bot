@@ -11,6 +11,10 @@ This project is designed to be fully self-hosted, ensuring privacy and zero API 
 * **Zero API Costs:** Powered by [Ollama](https://ollama.com/) running locally (using Llama 3 / 3.1).
 * **Asynchronous Handling:** Built with `aiohttp` to ensure the bot remains responsive while the AI generates answers.
 
+### 🌐 External APIs & Entertainment
+* **Real-Time Weather:** Check the current weather conditions, temperature, and humidity for any city globally using the OpenWeatherMap API.
+* **Interactive Trivia:** Test your computer science knowledge with a 15-second multiple-choice tech quiz that utilizes interactive Discord UI buttons (powered by OpenTDB).
+
 ### 🛡️ Moderation & Utility
 * **Moderation Commands:** Keep the server clean with `!clear`, `!kick`, and `!ban`.
 * **Server Info:** Retrieve real-time server statistics and latency with `!serverinfo` and `!ping`.
