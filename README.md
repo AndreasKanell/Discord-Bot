@@ -212,7 +212,6 @@ When successfully connected, you will see:
 ```text
 discord-bot/
 ├── .env                  # Environment secrets (Bot token)
-├── .gitignore            # Git ignore file (excludes .env, venv, logs)
 ├── discord.log           # Discord debug log generated on runtime
 ├── main.py               # Main bot implementation (AI, events, commands)
 ├── requirements.txt      # Python dependencies
