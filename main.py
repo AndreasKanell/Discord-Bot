@@ -11,6 +11,9 @@ import random
 load_dotenv()
 token = os.getenv('DISCORD_TOKEN')
 
+user_histories = {}
+MAX_HISTORY = 10  # Keep the last 10 messages (to prevent the model from running out of memory)
+
 handler = logging.FileHandler(filename='discord.log', encoding='utf-8', mode='w')
 intents = discord.Intents.default()
 intents.message_content = True
@@ -239,35 +242,76 @@ async def serverinfo(ctx):
 
     await ctx.send(embed=embed)
 
-# Ask command (Connected to local AI model)
-@bot.command()
-async def ask(ctx, *, prompt: str):
-    wait_msg = await ctx.send("🤔 Thinking about the answer... (may take some time)")
-
-    url = "http://localhost:11434/api/generate"
+# --------------- AI Interaction --------------------------------
+# Helper function to split huge messages
+async def send_long_message(channel, text, reference_message=None):
+    chunk_size = 1900 # Slightly below 2000 for absolute safety
+    # Split the text into chunks
+    chunks = [text[i:i + chunk_size] for i in range(0, len(text), chunk_size)]
     
-    payload = {
-        "model": "llama3.1:latest", 
-        "prompt": prompt,
-        "stream": False
-    }
+    for idx, chunk in enumerate(chunks):
+        if idx == 0 and reference_message:
+            # Reply to the user with the first chunk
+            await reference_message.reply(chunk)
+        else:
+            # Send the remaining chunks sequentially
+            await channel.send(chunk)
 
-    async with aiohttp.ClientSession() as session:
-        try:
-            async with session.post(url, json=payload) as response:
-                if response.status == 200:
-                    data = await response.json()
-                    answer = data.get("response", "I didn't get the answer from the model.")
-                    
-                    if len(answer) > 1950:
-                        answer = answer[:1950] + "\n... [The answer was cut due to words limit]"
-                        
-                    await wait_msg.edit(content=answer)
-                else:
-                    await wait_msg.edit(content=f"⚠️ Communication error: Code {response.status}")
-        
-        except aiohttp.ClientConnectorError:
-            await wait_msg.edit(content="❌ I couldn't connect to Ollama. Please make sure that the Ollama app is running at the backround of your pc.")
+@bot.event
+async def on_message(message):
+    # Ignore messages sent by the bot itself to prevent loops
+    if message.author.bot:
+        return
+
+    # Check if the bot was mentioned in the message
+    if bot.user in message.mentions:
+        # Show that the bot is "typing"
+        async with message.channel.typing():
+            # Remove the mention (e.g., @ProjectBot) from the user's text
+            user_input = message.content.replace(f'<@{bot.user.id}>', '').strip()
+            user_id = message.author.id
+
+            # If the user hasn't spoken before, create an empty history
+            if user_id not in user_histories:
+                # You can place a System Prompt here for specific behavior
+                user_histories[user_id] = [
+                    {"role": "system", "content": "You are a helpful, conversational AI assistant on a Discord server. Give clear and practical answers."}
+                ]
+
+            # Add the current question to memory
+            user_histories[user_id].append({"role": "user", "content": user_input})
+
+            # Keep only the defined message limit (leaving the system prompt intact at index 0)
+            if len(user_histories[user_id]) > MAX_HISTORY + 1:
+                user_histories[user_id] = [user_histories[user_id][0]] + user_histories[user_id][-MAX_HISTORY:]
+
+            # Prepare Ollama API call (Using /api/chat endpoint instead of /api/generate)
+            url = "http://localhost:11434/api/chat"
+            payload = {
+                "model": "llama3.1", # Make sure this is the model you have downloaded
+                "messages": user_histories[user_id],
+                "stream": False
+            }
+
+            try:
+                async with aiohttp.ClientSession() as session:
+                    async with session.post(url, json=payload) as response:
+                        if response.status == 200:
+                            data = await response.json()
+                            ai_response = data['message']['content']
+
+                            # Add the AI's response to memory so it remembers for next time
+                            user_histories[user_id].append({"role": "assistant", "content": ai_response})
+
+                            # Send the response using the new helper function for long texts
+                            await send_long_message(message.channel, ai_response, reference_message=message)
+                        else:
+                            await message.reply(f"⚠️ Error communicating with local AI. Status: {response.status}")
+            except Exception as e:
+                await message.reply(f"❌ Connection error: {e}")
+
+    # CRITICAL: Without this line, no other commands (like !weather or !trivia) will work!
+    await bot.process_commands(message)
 
 # weather 
 @bot.command()
@@ -445,8 +489,8 @@ async def help(ctx):
 
     # AI
     embed.add_field(
-        name="🤖 AI",
-        value="`!ask [question]` - The user interacts with an AI model (llama 3.1) that answers the user's question",
+        name="🤖 AI Interaction",
+        value=f"`@{bot.user.name} [question]` - Mention the bot to chat with the local AI model (Llama 3.1) with conversational memory.",
         inline=False
     )
 
