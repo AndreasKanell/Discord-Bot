@@ -219,7 +219,3 @@ discord-bot/
 ```
 
 ---
-
-## 🛡️ License
-
-This project is licensed under the [MIT License](LICENSE). You are free to modify, distribute, and self-host this bot.
