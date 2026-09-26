@@ -3,7 +3,6 @@
 [![Python Version](https://img.shields.io/badge/python-3.8%2B-blue.svg)](https://www.python.org/)
 [![discord.py](https://img.shields.io/badge/discord.py-2.x-5865F2.svg)](https://discordpy.readthedocs.io/)
 [![Ollama](https://img.shields.io/badge/AI-Ollama%20(Llama%203.1)-black.svg)](https://ollama.com/)
-[![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
 A powerful, self-hosted Discord bot written in Python using **`discord.py`**. The bot integrates a **local AI conversational assistant** powered by **Ollama (`llama3.1`)**, an automated **server audit logging system**, interactive **moderation & utility tools**, live **weather updates**, and an interactive **tech trivia game** with Discord UI buttons.
 
